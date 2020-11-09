@@ -60,7 +60,7 @@ calendR(
   bg.col = "#f4f4f4",                    # bg col
   lty = 0,
   title = "KALENDER 2021",
-  orientation = "lanscape",
+  orientation = "l", 
   papersize = "A4",
   pdf = TRUE
 )
