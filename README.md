@@ -6,7 +6,7 @@ Skrip untuk membuat kalender 2021 menggunakan library `calendR`. Data hari libur
 
 ## To Do
 
-- menambah keterangan hari libur
+- ~menambah keterangan hari libur~
 - menandai hari-hari puasa (optional)
 - membuat gambar latar belakang
 
