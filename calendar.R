@@ -1,11 +1,11 @@
 library("rvest")
 library("dplyr")
 
-# harvesting Indonesia's holiday
+# harvesting Indonesia's holiday data
 page_event <- "https://www.liburnasional.com/kalender-lengkap-2021/" %>% 
   read_html()
 
-event <- page_event %>% 
+table <- page_event %>% 
   html_nodes(".libnas-calendar-full-detail") %>% 
   html_table() %>% 
   bind_rows() %>% 
@@ -13,54 +13,70 @@ event <- page_event %>%
   as_tibble()
 
 # mapping the holidays' day
-event <- rbind(event, event[rep(8,1),])
+event <- rbind(table, table[rep(8,1),])
 event[8,1] <- "15 Mei"
 event[16,1] <- "16 Mei"
 
-event <- tidyr::separate(event, X1, c("tanggal", "bulan"), " ")
-
-event$tanggal <- as.integer(event$tanggal)
-event$bulan <- substr(event$bulan, 1, 3) %>% 
-  ifelse(. == "Mei", "May", .) %>% 
-  ifelse(. == "Agu", "Aug", .) %>%
-  ifelse(. == "Okt", "Oct", .) %>% 
-  ifelse(. == "Des", "Dec", .)
-
-dcount <- c(rep(c(31,30), 3), 31, rep(c(31, 30), 3))[1:12] %>% 
-  replace(2, 28)
-event_num <- tidyr::tibble(
-  num = 1L:12L, 
-  bulan = month.abb, 
-  dcount = dcount,
-  kumulatif = cumsum(dcount)
-)
-
-event <- inner_join(event, event_num, by = "bulan")
+event$X1 <- paste0(event$X1, " 21") %>% 
+  as.Date("%d %b %y")
 
 event <- event %>% 
-  select(tanggal, num, dcount, kumulatif, X3) %>% 
-  rename(bulan = num, perayaan = X3) %>% 
-  mutate(hari = kumulatif-dcount+tanggal) %>% 
-  select(hari, tanggal, perayaan) %>% 
-  arrange(hari)
+  rename("tanggal" = "X1", "peringatan" = "X3") %>% 
+  mutate(hari = julian.Date(.$tanggal, origin = as.Date("2020-12-31"))) %>% 
+  arrange(by = tanggal)
+
+eventR <- c(paste(2021, 7, 6:9, sep = "-")) %>% 
+  as.Date() %>% 
+  julian.Date(origin = as.Date("2020-12-31"))
 
 tanggal <- seq(as.Date("2021-01-01"), as.Date("2021-12-31"), by = "1 day")
 holiday <- ifelse(format(tanggal, "%w") %in% c(6, 0), "Weekend", NA)
-holiday[event$hari] <- "Libur Nasional" 
+holiday[event$hari] <- "Hari Libur Nasional" 
+holiday[eventR] <- "User! 2021 Conference"
+
 # create calendar
 library("calendR")
-calendR(
+library("gridExtra")
+
+kalender <- calendR(
   year = 2021, 
-  start = "M", 
+  start = "M",
   special.days = holiday, 
-  special.col = c("lightblue", "pink"),  # holidays col
-  days.col = 1,                          # days text col
-  months.col = "white",                  # months text col
-  mbg.col = 4,                           # months bg col
-  bg.col = "#f4f4f4",                    # bg col
-  lty = 0,
-  title = "KALENDER 2021",
-  orientation = "l", 
-  papersize = "A4",
-  pdf = TRUE
+  special.col = c(        # holidays col 
+    "#69db7c",            # libur, darker #40c057
+    "#4dabf7",            # useR conf, darker #228be6
+    "#b2f2bb"),           # weekend
+  days.col = 1,           # days text col
+  months.col = "white",   # months text col
+  mbg.col = "#2e3440",    # months bg header col
+  bg.col = "#ffffff",     # bg col, #f4f4f4 for grey
+  legend.pos = "bottom",
+  lty = 1,
+  lwd = 0.5,
+  col = "white",
+  title = "K A L E N D E R   2 0 2 1",
+  title.size = "14",
+  subtitle = "UseR Indonesia",
+  subtitle.size = 12,
+  margin = c(.5, 1, .1, 1),    # top, right, bottom, left
+  orientation = "l"
+)
+
+tblplot <- bind_cols(table[1:3,],table[4:6,],table[7:9,],table[10:12,],table[13:15,]) %>% 
+  `names<-`(paste0("x", 1:10))
+
+keterangan <- tableGrob(
+  d = tblplot, rows = NULL, cols = NULL,
+  theme = ttheme_minimal(
+    base_size = 8, 
+    base_colour = "grey25"
+  )
+)
+
+doc <- grid.arrange(kalender, keterangan, nrow = 2, heights = c(6,1))
+
+ggplot2::ggsave(
+  file = "Calendar_2021.pdf", plot = doc,
+  width = 11.69, height = 8.27, # A4 landscape
+  units = "in", dpi = 300
 )
